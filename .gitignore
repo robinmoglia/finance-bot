@@ -5,3 +5,4 @@ __pycache__/        # Python cache
 *.pyc
 .venv/              # your local virtual environment
 venv/
+.DS_Store
