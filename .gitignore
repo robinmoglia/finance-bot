@@ -1,0 +1,7 @@
+# Files that must NEVER go to GitHub.
+
+.env                # your secret API key
+__pycache__/        # Python cache
+*.pyc
+.venv/              # your local virtual environment
+venv/

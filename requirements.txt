@@ -1,0 +1,13 @@
+# Python dependencies for the finance bot.
+# Install everything with:  pip install -r requirements.txt
+
+google-genai        # Official Google SDK to call the Gemini API
+python-dotenv       # Loads your secret API key from the .env file
+streamlit           # Turns a Python script into a web app (for the demo)
+
+# For the market-analysis module (analyse.py):
+yfinance            # Free daily market data (stocks + indices)
+pandas              # Data handling and indicators
+numpy               # Math (volatility)
+plotly              # Interactive candlestick / RSI charts
+pypdf               # Read text from PDF files (for the Documents / RAG page)
