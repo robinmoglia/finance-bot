@@ -1,19 +1,13 @@
 """
 bot.py — The automatic trading bot (paper, Alpaca).
 
-This is a STANDALONE script (it does NOT use Streamlit). Each time you run it,
-it does ONE pass over the watchlist:
-  - computes the MA20/MA50 signal for each stock,
-  - looks at your current Alpaca position,
-  - buys if the signal turned to "buy" and you're not invested,
-  - sells (closes) if the signal turned to "flat" and you hold the stock,
-  - does nothing otherwise.
+Standalone script (no Streamlit). Each run does ONE pass over the watchlist:
+computes the MA/RSI signal for each stock, compares to your Alpaca position,
+buys/sells accordingly, and logs the decision — with the numbers behind it and,
+for real trades, a one-sentence English explanation written by Gemini.
 
-Run one pass:      python bot.py
-Run in a loop:     python bot.py --loop        (checks every hour, Ctrl+C to stop)
-
-To make it fully automatic, schedule "python bot.py" once a day (see README /
-the cron example your assistant gave you). The bot only runs when your Mac is on.
+Run one pass:  python bot.py
+Run in a loop: python bot.py --loop
 
 ⚠️ Paper money only. Educational project — not investment advice.
 """
@@ -31,42 +25,74 @@ from alpaca.trading.enums import OrderSide, TimeInForce
 
 
 # ===========================================================================
-#  CONFIG — edit these to change the bot's behavior
+#  CONFIG
 # ===========================================================================
-WATCHLIST = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA"]  # US stocks only
-SHORT_WINDOW = 20      # short moving average (days)
-LONG_WINDOW = 50       # long moving average (days)
-QTY = 5                # number of shares to buy per position
-LOOP_EVERY = 3600      # seconds between checks in --loop mode (3600 = 1 hour)
+WATCHLIST = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA"]
+SHORT_WINDOW = 20
+LONG_WINDOW = 50
+QTY = 5
+LOOP_EVERY = 3600
 
 
 # --- Setup -----------------------------------------------------------------
 load_dotenv()
 API_KEY = os.environ.get("ALPACA_API_KEY")
 SECRET_KEY = os.environ.get("ALPACA_SECRET_KEY")
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 
 if not API_KEY or not SECRET_KEY:
     raise SystemExit(
-        "Clés Alpaca manquantes. Ajoute ALPACA_API_KEY et ALPACA_SECRET_KEY "
-        "dans ton fichier .env."
+        "Clés Alpaca manquantes. Ajoute ALPACA_API_KEY et ALPACA_SECRET_KEY dans .env."
     )
 
 client = TradingClient(API_KEY, SECRET_KEY, paper=True)
 
+# Optional Gemini client for the English explanations (skipped if no key).
+_llm = None
+if GEMINI_KEY:
+    try:
+        from google import genai
+        _llm = genai.Client(api_key=GEMINI_KEY)
+    except Exception:
+        _llm = None
 
-# --- Strategy helpers ------------------------------------------------------
-def signal(symbol: str):
-    """True = buy signal (short MA > long MA), False = flat, None = no data."""
+
+# --- Strategy: signal + the numbers behind it ------------------------------
+def analyze(symbol: str):
+    """Return {buy, ma_s, ma_l, rsi} for `symbol`, or None if not enough data."""
     df = yf.Ticker(symbol).history(period="1y")
     if df.empty or len(df) < LONG_WINDOW + 2:
         return None
-    short = df["Close"].rolling(SHORT_WINDOW).mean().iloc[-1]
-    long = df["Close"].rolling(LONG_WINDOW).mean().iloc[-1]
-    return bool(short > long)
+    close = df["Close"]
+    ma_s = close.rolling(SHORT_WINDOW).mean().iloc[-1]
+    ma_l = close.rolling(LONG_WINDOW).mean().iloc[-1]
+    delta = close.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    rs = gain.rolling(14).mean() / loss.rolling(14).mean()
+    rsi = (100 - 100 / (1 + rs)).iloc[-1]
+    return {"buy": bool(ma_s > ma_l), "ma_s": ma_s, "ma_l": ma_l, "rsi": rsi}
+
+
+def explain(action: str, symbol: str, info: dict) -> str | None:
+    """Ask Gemini for a one-sentence English explanation of a real trade."""
+    if _llm is None:
+        return None
+    prompt = (
+        "In ONE short sentence, in English, explain this automated paper-trading "
+        "action for a student project. Be concise and educational, and do not give "
+        f"investment advice. Action: {action} {symbol}. Strategy: MA{SHORT_WINDOW}/"
+        f"MA{LONG_WINDOW} crossover. Current values: MA{SHORT_WINDOW}={info['ma_s']:.2f}, "
+        f"MA{LONG_WINDOW}={info['ma_l']:.2f}, RSI(14)={info['rsi']:.0f}."
+    )
+    try:
+        r = _llm.models.generate_content(model="gemini-flash-lite-latest", contents=prompt)
+        return r.text.strip()
+    except Exception:
+        return None
 
 
 def held_qty(symbol: str) -> float:
-    """How many shares of `symbol` we currently hold (0 if none)."""
     try:
         return float(client.get_open_position(symbol).qty)
     except Exception:
@@ -79,7 +105,7 @@ def order(symbol: str, qty: float, side: OrderSide):
     ))
 
 
-# --- One pass over the whole watchlist -------------------------------------
+# --- One pass over the watchlist -------------------------------------------
 def run_once():
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     account = client.get_account()
@@ -87,26 +113,36 @@ def run_once():
         is_open = client.get_clock().is_open
     except Exception:
         is_open = None
-    market = "ouvert" if is_open else "fermé (les ordres seront exécutés à l'ouverture)"
+    market = "ouvert" if is_open else "fermé (ordres exécutés à l'ouverture)"
     print(f"\n=== Bot — {now} | portefeuille {float(account.portfolio_value):,.0f} $ | marché {market} ===")
 
     for symbol in WATCHLIST:
-        sig = signal(symbol)
-        if sig is None:
+        info = analyze(symbol)
+        if info is None:
             print(f"  {symbol:6} : pas assez de données, ignoré")
             continue
 
         pos = held_qty(symbol)
+        sign = ">" if info["buy"] else "<"
+        nums = (f"(MA{SHORT_WINDOW}={info['ma_s']:.2f} {sign} MA{LONG_WINDOW}="
+                f"{info['ma_l']:.2f}, RSI {info['rsi']:.0f})")
+
         try:
-            if sig and pos <= 0:                       # buy signal, not invested
+            if info["buy"] and pos <= 0:                      # buy signal, not invested
                 order(symbol, QTY, OrderSide.BUY)
-                print(f"  {symbol:6} : signal ACHAT  -> achat de {QTY}")
-            elif not sig and pos > 0:                  # flat signal, holding -> close
+                print(f"  {symbol:6} : ACHAT  {nums} -> achat de {QTY}")
+                why = explain("BUY", symbol, info)
+                if why:
+                    print(f"           💡 {why}")
+            elif not info["buy"] and pos > 0:                 # flat signal, holding -> close
                 order(symbol, pos, OrderSide.SELL)
-                print(f"  {symbol:6} : signal SORTIE -> vente de {pos:g}")
+                print(f"  {symbol:6} : SORTIE {nums} -> vente de {pos:g}")
+                why = explain("SELL", symbol, info)
+                if why:
+                    print(f"           💡 {why}")
             else:
-                state = "achat" if sig else "hors marché"
-                print(f"  {symbol:6} : rien à faire (signal {state}, position {pos:g})")
+                state = "achat" if info["buy"] else "hors marché"
+                print(f"  {symbol:6} : rien à faire {nums} (signal {state}, position {pos:g})")
         except Exception as e:
             print(f"  {symbol:6} : ERREUR ordre -> {e}")
 
