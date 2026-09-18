@@ -1,0 +1,12 @@
+# Bot instructions (write in English, one guideline per line).
+# Lines starting with "#" are ignored. Leave the file with only comments to let
+# the bot follow its strategy WITHOUT any extra filter (current behavior).
+#
+# When you add real lines (remove the "#"), the bot checks EACH trade against them
+# before executing: if a trade goes against your instructions, it is skipped.
+#
+# Examples (uncomment to activate):
+# Be cautious on technology stocks.
+# Never buy TSLA.
+# Do not buy when RSI is above 70 (overbought).
+# Prefer keeping cash when the overall market looks very volatile.
