@@ -9,6 +9,7 @@ Two modes:
 
 import os
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from common import t, pick_symbol
@@ -134,6 +135,69 @@ def dashboard():
 
 
 dashboard()
+
+
+# ===========================================================================
+#  BOT ENTRY / EXIT POINTS ON A CHART (read-only, visible to everyone)
+# ===========================================================================
+st.divider()
+st.subheader(t("trades_header"))
+
+from alpaca.trading.requests import GetOrdersRequest
+from alpaca.trading.enums import QueryOrderStatus
+
+try:
+    all_orders = client.get_orders(GetOrdersRequest(status=QueryOrderStatus.ALL, limit=200))
+except Exception:
+    all_orders = []
+
+# Symbols the bot has touched (from orders + current positions).
+traded = sorted({o.symbol for o in all_orders}
+                | {p.symbol for p in client.get_all_positions()})
+
+if not traded:
+    st.caption(t("no_trades_yet"))
+else:
+    col_s, col_p = st.columns([2, 1])
+    with col_s:
+        sym = st.selectbox(t("stock_label"), traded, key="trade_sym")
+    with col_p:
+        tperiod = st.selectbox(t("period_label"), ["3mo", "6mo", "1y"], index=1, key="trade_period")
+
+    df = get_prices(sym.replace(".", "-"), tperiod)   # Yahoo format for prices
+    if df.empty:
+        st.caption(t("no_data", ticker=sym))
+    else:
+        df = df.copy()
+        df["MA20"] = df["Close"].rolling(20).mean()
+        df["MA50"] = df["Close"].rolling(50).mean()
+
+        fig = go.Figure()
+        fig.add_trace(go.Candlestick(
+            x=df.index, open=df["Open"], high=df["High"],
+            low=df["Low"], close=df["Close"], name=t("trace_price"),
+        ))
+        fig.add_trace(go.Scatter(x=df.index, y=df["MA20"], name="MA20", line=dict(width=1)))
+        fig.add_trace(go.Scatter(x=df.index, y=df["MA50"], name="MA50", line=dict(width=1)))
+
+        # Real filled orders on this symbol -> markers at fill date & price.
+        fills = [o for o in all_orders if o.symbol == sym
+                 and getattr(o, "filled_at", None) and getattr(o, "filled_avg_price", None)]
+        bx = [o.filled_at for o in fills if o.side.value == "buy"]
+        by = [float(o.filled_avg_price) for o in fills if o.side.value == "buy"]
+        sx = [o.filled_at for o in fills if o.side.value == "sell"]
+        sy = [float(o.filled_avg_price) for o in fills if o.side.value == "sell"]
+        fig.add_trace(go.Scatter(x=bx, y=by, mode="markers", name=t("trace_buy"),
+                                 marker=dict(symbol="triangle-up", size=13, color="green")))
+        fig.add_trace(go.Scatter(x=sx, y=sy, mode="markers", name=t("trace_sell"),
+                                 marker=dict(symbol="triangle-down", size=13, color="red")))
+        fig.update_layout(
+            height=460, xaxis_rangeslider_visible=False,
+            legend=dict(orientation="h", y=1.02, yanchor="bottom"),
+            margin=dict(l=10, r=10, t=30, b=10),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption(t("trades_caption"))
 
 
 # ===========================================================================
