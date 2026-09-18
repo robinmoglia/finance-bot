@@ -98,8 +98,10 @@ TR = {
         ),
         "enter_symbol": "Entre un symbole ci-dessus pour lancer l'analyse.",
         "no_data": (
-            "Aucune donnée pour « {ticker} ». Vérifie le symbole "
-            "(ex. `MC.PA` pour LVMH, `^FCHI` pour le CAC 40)."
+            "Aucune donnée pour « {ticker} ». Cherche le symbole exact sur "
+            "finance.yahoo.com. Pour les valeurs européennes, ajoute le suffixe de "
+            "place : `MC.PA` (LVMH, Paris), `SIE.DE` (Francfort), `ASML.AS` (Amsterdam), "
+            "`^FCHI` (CAC 40)."
         ),
         "m_last": "Dernier cours",
         "m_change": "Variation ({period})",
@@ -238,8 +240,9 @@ TR = {
         ),
         "enter_symbol": "Enter a symbol above to start the analysis.",
         "no_data": (
-            "No data for “{ticker}”. Check the symbol "
-            "(e.g. `MC.PA` for LVMH, `^FCHI` for the CAC 40)."
+            "No data for “{ticker}”. Look up the exact symbol on finance.yahoo.com. "
+            "For European stocks, add the exchange suffix: `MC.PA` (LVMH, Paris), "
+            "`SIE.DE` (Frankfurt), `ASML.AS` (Amsterdam), `^FCHI` (CAC 40)."
         ),
         "m_last": "Last price",
         "m_change": "Change ({period})",
