@@ -2,12 +2,12 @@
 
 import numpy as np
 import pandas as pd
-import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 
-from common import generate, check_key, t
+from common import generate, check_key, t, pick_symbol
+from data import get_prices
 
 check_key()
 
@@ -17,23 +17,17 @@ st.caption(t("disclaimer"))
 # --- Inputs ----------------------------------------------------------------
 col_a, col_b = st.columns([2, 1])
 with col_a:
-    ticker = st.text_input(t("symbol_label"), value="AAPL").strip()
+    ticker = pick_symbol("analyse")
 with col_b:
     period = st.selectbox(t("period_label"), ["3mo", "6mo", "1y", "2y", "5y"], index=2)
 
-st.caption(t("examples"))
 
-
-# --- Download --------------------------------------------------------------
-@st.cache_data(ttl=3600)
-def load_data(symbol: str, period: str) -> pd.DataFrame:
-    return yf.Ticker(symbol).history(period=period)
-
+# --- Download (via the shared data layer: Yahoo or Refinitiv) --------------
 if not ticker:
     st.info(t("enter_symbol"))
     st.stop()
 
-data = load_data(ticker, period)
+data = get_prices(ticker, period)
 if data.empty:
     st.error(t("no_data", ticker=ticker))
     st.stop()

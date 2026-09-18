@@ -90,6 +90,9 @@ TR = {
         # analyse
         "analyse_title": "📈 Analyse Marché",
         "symbol_label": "Symbole (format Yahoo Finance)",
+        "market_label": "Marché",
+        "company_label": "Entreprise",
+        "custom_group": "✏️ Autre (saisir un symbole)",
         "period_label": "Période",
         "examples": (
             "Exemples — **Actions** : `AAPL` (Apple), `MSFT`, `TSLA`, `MC.PA` (LVMH), "
@@ -232,6 +235,9 @@ TR = {
         ),
         "analyse_title": "📈 Market Analysis",
         "symbol_label": "Symbol (Yahoo Finance format)",
+        "market_label": "Market",
+        "company_label": "Company",
+        "custom_group": "✏️ Other (enter a symbol)",
         "period_label": "Period",
         "examples": (
             "Examples — **Stocks**: `AAPL` (Apple), `MSFT`, `TSLA`, `MC.PA` (LVMH), "
@@ -373,3 +379,62 @@ def embed_texts(texts: list[str], batch_size: int = 50) -> list[list[float]]:
         result = client.models.embed_content(model=EMBED_MODEL, contents=batch)
         vectors.extend(e.values for e in result.embeddings)
     return vectors
+
+
+# ===========================================================================
+#  READY-MADE SYMBOL LISTS + PICKER
+# ===========================================================================
+# Ready-made lists of Yahoo Finance tickers, so the user can pick from a menu
+# instead of typing symbols. "name shown to the user": "yahoo ticker".
+PRESETS = {
+    "CAC 40": {
+        "Accor": "AC.PA", "Air Liquide": "AI.PA", "Airbus": "AIR.PA",
+        "Alstom": "ALO.PA", "AXA": "CS.PA", "BNP Paribas": "BNP.PA",
+        "Bouygues": "EN.PA", "Capgemini": "CAP.PA", "Carrefour": "CA.PA",
+        "Crédit Agricole": "ACA.PA", "Danone": "BN.PA", "Dassault Systèmes": "DSY.PA",
+        "Edenred": "EDEN.PA", "Engie": "ENGI.PA", "EssilorLuxottica": "EL.PA",
+        "Hermès": "RMS.PA", "Kering": "KER.PA", "Legrand": "LR.PA",
+        "L'Oréal": "OR.PA", "LVMH": "MC.PA", "Michelin": "ML.PA",
+        "Orange": "ORA.PA", "Pernod Ricard": "RI.PA", "Publicis": "PUB.PA",
+        "Renault": "RNO.PA", "Safran": "SAF.PA", "Saint-Gobain": "SGO.PA",
+        "Sanofi": "SAN.PA", "Schneider Electric": "SU.PA", "Société Générale": "GLE.PA",
+        "Stellantis": "STLAP.PA", "STMicroelectronics": "STMPA.PA", "Teleperformance": "TEP.PA",
+        "Thales": "HO.PA", "TotalEnergies": "TTE.PA", "Veolia": "VIE.PA",
+        "Vinci": "DG.PA",
+    },
+    "S&P 500 (grandes valeurs)": {
+        "Apple": "AAPL", "Microsoft": "MSFT", "Nvidia": "NVDA", "Amazon": "AMZN",
+        "Alphabet (Google)": "GOOGL", "Meta": "META", "Tesla": "TSLA",
+        "Berkshire Hathaway": "BRK-B", "JPMorgan": "JPM", "Visa": "V",
+        "Mastercard": "MA", "UnitedHealth": "UNH", "Johnson & Johnson": "JNJ",
+        "Walmart": "WMT", "Procter & Gamble": "PG", "ExxonMobil": "XOM",
+        "Home Depot": "HD", "Coca-Cola": "KO", "PepsiCo": "PEP", "Netflix": "NFLX",
+        "Disney": "DIS", "McDonald's": "MCD", "Nike": "NKE", "Intel": "INTC",
+        "AMD": "AMD", "Boeing": "BA", "Salesforce": "CRM", "Adobe": "ADBE",
+        "Oracle": "ORCL", "Pfizer": "PFE", "Bank of America": "BAC", "Chevron": "CVX",
+        "Costco": "COST", "Starbucks": "SBUX", "Goldman Sachs": "GS", "IBM": "IBM",
+        "Qualcomm": "QCOM", "Uber": "UBER", "Ford": "F",
+    },
+    "Indices": {
+        "CAC 40 (indice)": "^FCHI", "S&P 500 (indice)": "^GSPC",
+        "Nasdaq (indice)": "^IXIC", "Dow Jones (indice)": "^DJI",
+    },
+}
+
+
+def pick_symbol(key: str) -> str:
+    """Show a market menu + company menu (with an 'Other' free-text option) and
+    return the chosen Yahoo Finance ticker."""
+    options = list(PRESETS.keys()) + ["__custom__"]
+    market = st.selectbox(
+        t("market_label"), options,
+        format_func=lambda o: t("custom_group") if o == "__custom__" else o,
+        key=key + "_mkt",
+    )
+    if market == "__custom__":
+        sym = st.text_input(t("symbol_label"), value="AAPL", key=key + "_txt").strip()
+        st.caption(t("examples"))
+        return sym
+    mapping = PRESETS[market]
+    name = st.selectbox(t("company_label"), list(mapping.keys()), key=key + "_co")
+    return mapping[name]

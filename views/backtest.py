@@ -2,11 +2,11 @@
 
 import numpy as np
 import pandas as pd
-import yfinance as yf
 import plotly.graph_objects as go
 import streamlit as st
 
-from common import generate, check_key, t
+from common import generate, check_key, t, pick_symbol
+from data import get_prices
 
 check_key()
 
@@ -15,9 +15,8 @@ st.caption(t("backtest_caption"))
 
 
 # --- Inputs ----------------------------------------------------------------
-col_a, col_b, col_c = st.columns([2, 1, 1])
-with col_a:
-    ticker = st.text_input(t("symbol_label"), value="AAPL").strip()
+ticker = pick_symbol("backtest")
+col_b, col_c = st.columns(2)
 with col_b:
     period = st.selectbox(t("period_label"), ["1y", "2y", "5y", "10y", "max"], index=2)
 with col_c:
@@ -34,16 +33,12 @@ if short_win >= long_win:
     st.stop()
 
 
-# --- Data ------------------------------------------------------------------
-@st.cache_data(ttl=3600)
-def load_data(symbol: str, period: str) -> pd.DataFrame:
-    return yf.Ticker(symbol).history(period=period)
-
+# --- Data (via the shared data layer: Yahoo or Refinitiv) ------------------
 if not ticker:
     st.info(t("enter_symbol_bt"))
     st.stop()
 
-data = load_data(ticker, period)
+data = get_prices(ticker, period)
 if data.empty or len(data) < long_win + 5:
     st.error(t("not_enough", ticker=ticker))
     st.stop()
