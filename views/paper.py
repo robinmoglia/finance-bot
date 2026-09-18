@@ -32,17 +32,6 @@ LOCAL = bool(_cred("LOCAL_MODE"))   # trading controls only appear when this is 
 st.title(t("paper_title"))
 st.caption(t("paper_caption"))
 
-# --- TEMP DEBUG (à retirer une fois le souci réglé) ------------------------
-try:
-    _sec_local = st.secrets.get("LOCAL_MODE")
-except Exception:
-    _sec_local = "(aucun secrets.toml)"
-st.warning(
-    f"🔧 DEBUG build-v3 · LOCAL={LOCAL} · "
-    f"env LOCAL_MODE={os.environ.get('LOCAL_MODE')!r} · "
-    f"secret LOCAL_MODE={_sec_local!r}"
-)
-
 if not API_KEY or not SECRET_KEY:
     st.info(t("alpaca_missing"))
     st.stop()

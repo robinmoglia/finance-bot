@@ -6,3 +6,4 @@ __pycache__/        # Python cache
 .venv/              # your local virtual environment
 venv/
 .DS_Store
+.env
