@@ -55,79 +55,85 @@ if not LOCAL:
     st.success(t("readonly_note"))
 
 
-# --- Account panel ----------------------------------------------------------
-st.subheader(t("account_header"))
-positions = client.get_all_positions()
+# --- Live dashboard (auto-refreshes every 30 seconds) ----------------------
+# @st.fragment(run_every=30) reruns ONLY this block every 30s, so the account,
+# positions, chart and orders update on their own without reloading the page.
+@st.fragment(run_every=30)
+def dashboard():
+    acct = client.get_account()
+    positions = client.get_all_positions()
 
-m1, m2, m3, m4 = st.columns(4)
-m1.metric(t("m_cash"), f"{float(account.cash):,.0f} $")
-m2.metric(t("m_portfolio"), f"{float(account.portfolio_value):,.0f} $")
-m3.metric(t("m_buying_power"), f"{float(account.buying_power):,.0f} $")
-m4.metric(t("m_positions"), len(positions))
+    # Account panel
+    st.subheader(t("account_header"))
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric(t("m_cash"), f"{float(acct.cash):,.0f} $")
+    m2.metric(t("m_portfolio"), f"{float(acct.portfolio_value):,.0f} $")
+    m3.metric(t("m_buying_power"), f"{float(acct.buying_power):,.0f} $")
+    m4.metric(t("m_positions"), len(positions))
 
-
-# --- Equity curve (portfolio value over time) ------------------------------
-st.subheader(t("equity_header"))
-try:
-    from alpaca.trading.requests import GetPortfolioHistoryRequest
-    hist = client.get_portfolio_history(
-        GetPortfolioHistoryRequest(period="1M", timeframe="1D")
-    )
-    if hist.timestamp and hist.equity:
-        eq = pd.DataFrame(
-            {"$": [v for v in hist.equity]},
-            index=pd.to_datetime(hist.timestamp, unit="s"),
+    # Equity curve (portfolio value over time)
+    st.subheader(t("equity_header"))
+    try:
+        from alpaca.trading.requests import GetPortfolioHistoryRequest
+        hist = client.get_portfolio_history(
+            GetPortfolioHistoryRequest(period="1M", timeframe="1D")
         )
-        st.line_chart(eq)
-    else:
+        if hist.timestamp and hist.equity:
+            eq = pd.DataFrame(
+                {"$": [v for v in hist.equity]},
+                index=pd.to_datetime(hist.timestamp, unit="s"),
+            )
+            st.line_chart(eq)
+        else:
+            st.caption("—")
+    except Exception:
         st.caption("—")
-except Exception:
-    st.caption("—")
+
+    # Open positions + P/L bar chart
+    st.subheader(t("positions_header"))
+    if positions:
+        rows = [{
+            "Symbole": p.symbol,
+            "Qté": float(p.qty),
+            "Prix moyen": round(float(p.avg_entry_price), 2),
+            "Valeur ($)": round(float(p.market_value), 2),
+            "P/L latent ($)": round(float(p.unrealized_pl), 2),
+            "P/L (%)": round(float(p.unrealized_plpc) * 100, 2),
+        } for p in positions]
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+        st.caption(t("pl_header"))
+        pl = pd.DataFrame(
+            {"P/L ($)": [float(p.unrealized_pl) for p in positions]},
+            index=[p.symbol for p in positions],
+        )
+        st.bar_chart(pl)
+    else:
+        st.caption(t("no_positions"))
+
+    # Recent orders
+    st.subheader(t("orders_header"))
+    try:
+        from alpaca.trading.requests import GetOrdersRequest
+        from alpaca.trading.enums import QueryOrderStatus
+        orders = client.get_orders(GetOrdersRequest(status=QueryOrderStatus.ALL, limit=15))
+    except Exception:
+        orders = []
+
+    if orders:
+        orows = [{
+            "Date": str(o.submitted_at)[:16],
+            "Symbole": o.symbol,
+            "Sens": o.side.value,
+            "Qté": float(o.qty) if o.qty else None,
+            "Statut": o.status.value,
+        } for o in orders]
+        st.dataframe(pd.DataFrame(orows), use_container_width=True, hide_index=True)
+    else:
+        st.caption(t("no_orders"))
 
 
-# --- Open positions + P/L bar chart ----------------------------------------
-st.subheader(t("positions_header"))
-if positions:
-    rows = [{
-        "Symbole": p.symbol,
-        "Qté": float(p.qty),
-        "Prix moyen": round(float(p.avg_entry_price), 2),
-        "Valeur ($)": round(float(p.market_value), 2),
-        "P/L latent ($)": round(float(p.unrealized_pl), 2),
-        "P/L (%)": round(float(p.unrealized_plpc) * 100, 2),
-    } for p in positions]
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-
-    st.caption(t("pl_header"))
-    pl = pd.DataFrame(
-        {"P/L ($)": [float(p.unrealized_pl) for p in positions]},
-        index=[p.symbol for p in positions],
-    )
-    st.bar_chart(pl)
-else:
-    st.caption(t("no_positions"))
-
-
-# --- Recent orders ----------------------------------------------------------
-st.subheader(t("orders_header"))
-try:
-    from alpaca.trading.requests import GetOrdersRequest
-    from alpaca.trading.enums import QueryOrderStatus
-    orders = client.get_orders(GetOrdersRequest(status=QueryOrderStatus.ALL, limit=15))
-except Exception:
-    orders = []
-
-if orders:
-    orows = [{
-        "Date": str(o.submitted_at)[:16],
-        "Symbole": o.symbol,
-        "Sens": o.side.value,
-        "Qté": float(o.qty) if o.qty else None,
-        "Statut": o.status.value,
-    } for o in orders]
-    st.dataframe(pd.DataFrame(orows), use_container_width=True, hide_index=True)
-else:
-    st.caption(t("no_orders"))
+dashboard()
 
 
 # ===========================================================================
