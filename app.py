@@ -26,6 +26,7 @@ assistant = st.Page("views/assistant.py", title=tr["nav_assistant"], icon="💬"
 analyse = st.Page("views/analyse.py", title=tr["nav_analyse"], icon="📈")
 backtest = st.Page("views/backtest.py", title=tr["nav_backtest"], icon="🧪")
 documents = st.Page("views/rag.py", title=tr["nav_documents"], icon="📄")
+paper = st.Page("views/paper.py", title=tr["nav_paper"], icon="🤖")
 
-pg = st.navigation([accueil, assistant, analyse, backtest, documents])
+pg = st.navigation([accueil, assistant, analyse, backtest, documents, paper])
 pg.run()

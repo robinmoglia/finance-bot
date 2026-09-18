@@ -195,6 +195,40 @@ TR = {
             "Réponds en français."
         ),
         "rag_prompt": "Passages du document :\n{context}\n\nQuestion : {question}",
+        # paper trading
+        "nav_paper": "Paper Trading",
+        "paper_title": "🤖 Paper Trading",
+        "paper_caption": "Trading en argent fictif via Alpaca — expérimentation, pas un conseil d'investissement.",
+        "alpaca_missing": (
+            "Clés Alpaca manquantes. En local, ajoute ALPACA_API_KEY et "
+            "ALPACA_SECRET_KEY dans ton fichier .env (compte paper sur alpaca.markets). "
+            "Le paper trading fonctionne en local, pas sur la version en ligne publique."
+        ),
+        "alpaca_connect_error": "Connexion à Alpaca impossible. Vérifie tes clés (mode paper).",
+        "account_header": "💼 Ton compte (paper)",
+        "m_cash": "Liquidités",
+        "m_portfolio": "Valeur du portefeuille",
+        "m_buying_power": "Pouvoir d'achat",
+        "m_positions": "Positions",
+        "positions_header": "📊 Positions ouvertes",
+        "no_positions": "Aucune position ouverte.",
+        "orders_header": "🧾 Derniers ordres",
+        "no_orders": "Aucun ordre pour l'instant.",
+        "equity_header": "📈 Valeur du portefeuille dans le temps",
+        "pl_header": "Résultat latent par position ($)",
+        "readonly_note": "👀 Vue en lecture seule — le bot trade automatiquement. Personne ne peut passer d'ordre ici.",
+        "strategy_header": "🎯 Passer un ordre",
+        "us_only": "⚠️ Alpaca ne trade que des actions américaines (AAPL, TSLA...).",
+        "qty_label": "Quantité (nb d'actions)",
+        "signal_invested": "Signal MA{short}/MA{long} : **ACHAT** (MA courte au-dessus de la longue).",
+        "signal_flat": "Signal MA{short}/MA{long} : **HORS MARCHÉ** (MA courte sous la longue).",
+        "btn_follow": "Suivre le signal",
+        "btn_buy": "Acheter",
+        "btn_sell": "Vendre / clôturer",
+        "order_ok": "✅ Ordre envoyé : {side} {qty} {symbol}.",
+        "order_err": "❌ Échec de l'ordre : {err}",
+        "nothing_to_do": "Rien à faire : le signal correspond déjà à ta position actuelle.",
+        "no_position_to_sell": "Tu n'as pas de position sur {symbol} à vendre.",
     },
     # ------------------------------------------------------------------ EN
     "en": {
@@ -336,6 +370,40 @@ TR = {
             "the passages, say so clearly instead of inventing. Answer in English."
         ),
         "rag_prompt": "Document passages:\n{context}\n\nQuestion: {question}",
+        # paper trading
+        "nav_paper": "Paper Trading",
+        "paper_title": "🤖 Paper Trading",
+        "paper_caption": "Paper (fake-money) trading via Alpaca — experimentation, not investment advice.",
+        "alpaca_missing": (
+            "Alpaca keys missing. Locally, add ALPACA_API_KEY and ALPACA_SECRET_KEY "
+            "to your .env file (paper account on alpaca.markets). Paper trading works "
+            "locally, not on the public online version."
+        ),
+        "alpaca_connect_error": "Couldn't connect to Alpaca. Check your keys (paper mode).",
+        "account_header": "💼 Your account (paper)",
+        "m_cash": "Cash",
+        "m_portfolio": "Portfolio value",
+        "m_buying_power": "Buying power",
+        "m_positions": "Positions",
+        "positions_header": "📊 Open positions",
+        "no_positions": "No open positions.",
+        "orders_header": "🧾 Recent orders",
+        "no_orders": "No orders yet.",
+        "equity_header": "📈 Portfolio value over time",
+        "pl_header": "Unrealized P/L by position ($)",
+        "readonly_note": "👀 Read-only view — the bot trades automatically. Nobody can place orders here.",
+        "strategy_header": "🎯 Place an order",
+        "us_only": "⚠️ Alpaca only trades US stocks (AAPL, TSLA...).",
+        "qty_label": "Quantity (shares)",
+        "signal_invested": "MA{short}/MA{long} signal: **BUY** (short MA above long MA).",
+        "signal_flat": "MA{short}/MA{long} signal: **FLAT** (short MA below long MA).",
+        "btn_follow": "Follow the signal",
+        "btn_buy": "Buy",
+        "btn_sell": "Sell / close",
+        "order_ok": "✅ Order sent: {side} {qty} {symbol}.",
+        "order_err": "❌ Order failed: {err}",
+        "nothing_to_do": "Nothing to do: the signal already matches your current position.",
+        "no_position_to_sell": "You have no position in {symbol} to sell.",
     },
 }
 
@@ -422,10 +490,14 @@ PRESETS = {
 }
 
 
-def pick_symbol(key: str) -> str:
+def pick_symbol(key: str, markets=None) -> str:
     """Show a market menu + company menu (with an 'Other' free-text option) and
-    return the chosen Yahoo Finance ticker."""
-    options = list(PRESETS.keys()) + ["__custom__"]
+    return the chosen Yahoo Finance ticker.
+
+    `markets` optionally restricts which preset groups are shown (e.g. US only).
+    """
+    groups = markets if markets is not None else list(PRESETS.keys())
+    options = groups + ["__custom__"]
     market = st.selectbox(
         t("market_label"), options,
         format_func=lambda o: t("custom_group") if o == "__custom__" else o,

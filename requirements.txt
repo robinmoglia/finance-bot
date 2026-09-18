@@ -11,3 +11,4 @@ pandas              # Data handling and indicators
 numpy               # Math (volatility)
 plotly              # Interactive candlestick / RSI charts
 pypdf               # Read text from PDF files (for the Documents / RAG page)
+alpaca-py           # Paper trading via Alpaca (for the Paper Trading page)
