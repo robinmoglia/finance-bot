@@ -162,9 +162,14 @@ def current_signal(sym: str):
     return bool(short > long)
 
 
+def _alpaca_sym(sym: str) -> str:
+    """Alpaca uses a dot for share classes (BRK.B) where Yahoo uses a dash (BRK-B)."""
+    return sym.replace("-", ".")
+
+
 def held_qty(sym: str) -> float:
     try:
-        return float(client.get_open_position(sym).qty)
+        return float(client.get_open_position(_alpaca_sym(sym)).qty)
     except Exception:
         return 0.0
 
@@ -173,7 +178,7 @@ def place(side: str, sym: str, quantity: float):
     from alpaca.trading.requests import MarketOrderRequest
     from alpaca.trading.enums import OrderSide, TimeInForce
     req = MarketOrderRequest(
-        symbol=sym, qty=quantity,
+        symbol=_alpaca_sym(sym), qty=quantity,
         side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
         time_in_force=TimeInForce.DAY,
     )
